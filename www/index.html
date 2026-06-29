@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E9AA7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="안약 체크">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>안약 점안 체크</title>
+<style>
+  :root{
+    --bg:#EAF2F3; --surface:#FFFFFF; --surface-2:#F4F9FA;
+    --primary:#0E9AA7; --primary-deep:#0A6E78; --primary-soft:#D5EEF0;
+    --ink:#102A33; --muted:#5E7A82; --line:#DAE7EA;
+    --done:#16A34A; --done-soft:#E3F5EA;
+    --pending:#D98A00; --pending-soft:#FBF0DA;
+    --missed:#DC4F69; --missed-soft:#FBE4E9;
+    --shadow:0 6px 22px rgba(16,42,51,.08);
+    --shadow-sm:0 2px 8px rgba(16,42,51,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    background:var(--bg); color:var(--ink);
+    -webkit-font-smoothing:antialiased; font-size:16px; line-height:1.45;
+    padding-bottom:calc(74px + env(safe-area-inset-bottom));
+  }
+  .tabular{font-variant-numeric:tabular-nums;}
+  .app{max-width:520px; margin:0 auto; min-height:100vh; position:relative;}
+
+  /* Header */
+  header.top{
+    background:linear-gradient(160deg,var(--primary) 0%,var(--primary-deep) 100%);
+    color:#fff; padding:calc(18px + env(safe-area-inset-top)) 20px 22px;
+    border-radius:0 0 26px 26px; box-shadow:var(--shadow);
+  }
+  .top .date-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .top .dow{font-size:13px; opacity:.85; letter-spacing:.5px;}
+  .top .bigdate{font-size:21px; font-weight:700; letter-spacing:.3px;}
+  .top .clock{font-size:14px; opacity:.9;}
+  .progress-card{display:flex; align-items:center; gap:18px; margin-top:16px;}
+  .drop-wrap{width:74px; height:84px; flex:0 0 auto; position:relative;}
+  .drop-count{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding-top:8px;}
+  .drop-count b{font-size:20px; font-weight:800; line-height:1;}
+  .drop-count span{font-size:10px; opacity:.85; margin-top:2px;}
+  .progress-text .pt-main{font-size:16px; font-weight:600;}
+  .progress-text .pt-sub{font-size:13px; opacity:.9; margin-top:3px;}
+
+  /* Views */
+  main{padding:16px 16px 8px;}
+  .view{display:none;} .view.active{display:block;}
+  .section-title{font-size:13px; font-weight:700; color:var(--muted); letter-spacing:.4px; margin:6px 4px 10px; text-transform:none;}
+
+  /* Dose card */
+  .timeblock{margin-bottom:18px;}
+  .timeblock-head{display:flex; align-items:center; gap:8px; margin:0 4px 8px;}
+  .timeblock-head .th-time{font-size:15px; font-weight:800; letter-spacing:.3px;}
+  .timeblock-head .th-tag{font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px;}
+  .th-tag.upcoming{background:var(--surface); color:var(--muted); border:1px solid var(--line);}
+  .th-tag.due{background:var(--pending-soft); color:var(--pending);}
+  .th-tag.done{background:var(--done-soft); color:var(--done);}
+
+  .dose{
+    display:flex; align-items:center; gap:13px; background:var(--surface);
+    border:1px solid var(--line); border-radius:16px; padding:13px 14px; margin-bottom:9px;
+    box-shadow:var(--shadow-sm); transition:transform .12s ease, border-color .2s, background .2s;
+  }
+  .dose:active{transform:scale(.992);}
+  .dose.checked{background:var(--done-soft); border-color:#BfE6CC;}
+  .dose .pill{width:6px; align-self:stretch; border-radius:6px; min-height:34px;}
+  .dose .info{flex:1; min-width:0;}
+  .dose .name{font-size:16px; font-weight:700; display:flex; align-items:center; gap:7px;}
+  .dose .name .eye{font-size:11px; font-weight:700; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); padding:1px 7px; border-radius:999px;}
+  .dose .meta{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .dose.checked .meta{color:var(--done);}
+  .check-btn{
+    flex:0 0 auto; width:52px; height:52px; border-radius:14px; border:2px solid var(--line);
+    background:var(--surface-2); color:var(--muted); font-size:24px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .15s;
+  }
+  .check-btn.on{background:var(--done); border-color:var(--done); color:#fff; box-shadow:0 4px 12px rgba(22,163,74,.32);}
+
+  .empty{text-align:center; color:var(--muted); padding:46px 20px; font-size:14px;}
+  .empty .em-ico{font-size:40px; display:block; margin-bottom:10px;}
+
+  /* Calendar */
+  .cal-head{display:flex; align-items:center; justify-content:space-between; margin:2px 4px 14px;}
+  .cal-head .mname{font-size:18px; font-weight:800;}
+  .cal-nav{display:flex; gap:8px;}
+  .cal-nav button{width:38px; height:38px; border-radius:12px; border:1px solid var(--line); background:var(--surface); font-size:18px; color:var(--ink); cursor:pointer;}
+  .weekdays{display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:6px;}
+  .weekdays span{text-align:center; font-size:11px; font-weight:700; color:var(--muted); padding:4px 0;}
+  .weekdays span.sun{color:var(--missed);} .weekdays span.sat{color:#3B82C4;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
+  .cell{aspect-ratio:1/1.06; border-radius:13px; background:var(--surface); border:1px solid var(--line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; cursor:pointer; position:relative; padding-top:2px;}
+  .cell.blank{background:transparent; border:none; cursor:default;}
+  .cell.future{color:var(--muted);}
+  .cell.today{border:2px solid var(--primary);}
+  .cell .dnum{font-size:13px; font-weight:700;}
+  .cell.sun .dnum{color:var(--missed);} .cell.sat .dnum{color:#3B82C4;}
+  .ring{width:18px; height:18px; border-radius:50%;
+    -webkit-mask:radial-gradient(circle 4px at center, transparent 98%, #000 100%);
+    mask:radial-gradient(circle 4px at center, transparent 98%, #000 100%);}
+  .dot-mini{width:7px; height:7px; border-radius:50%;}
+
+  /* Med list */
+  .med-row{display:flex; align-items:center; gap:13px; background:var(--surface); border:1px solid var(--line);
+    border-radius:16px; padding:13px 14px; margin-bottom:9px; box-shadow:var(--shadow-sm);}
+  .med-row .pill{width:6px; align-self:stretch; min-height:36px; border-radius:6px;}
+  .med-row .info{flex:1; min-width:0;}
+  .med-row .name{font-size:16px; font-weight:700;}
+  .med-row .meta{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .med-row.off{opacity:.5;}
+  .icon-btn{flex:0 0 auto; width:40px; height:40px; border-radius:11px; border:1px solid var(--line); background:var(--surface-2); font-size:17px; cursor:pointer; color:var(--ink);}
+
+  .add-btn{width:100%; padding:15px; border-radius:16px; border:1.5px dashed var(--primary); background:var(--primary-soft);
+    color:var(--primary-deep); font-size:15px; font-weight:700; cursor:pointer; margin-top:4px;}
+
+  /* Settings */
+  .set-card{background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow-sm); margin-bottom:14px; overflow:hidden;}
+  .set-row{display:flex; align-items:center; gap:12px; padding:15px 15px; border-bottom:1px solid var(--line);}
+  .set-row:last-child{border-bottom:none;}
+  .set-row .sr-info{flex:1;}
+  .set-row .sr-title{font-size:15px; font-weight:600;}
+  .set-row .sr-sub{font-size:12.5px; color:var(--muted); margin-top:2px;}
+  .seg{display:flex; background:var(--surface-2); border:1px solid var(--line); border-radius:11px; padding:3px; gap:3px;}
+  .seg button{border:none; background:transparent; padding:7px 12px; border-radius:9px; font-size:13px; font-weight:700; color:var(--muted); cursor:pointer;}
+  .seg button.on{background:var(--primary); color:#fff; box-shadow:0 2px 6px rgba(14,154,167,.3);}
+  .switch{position:relative; width:50px; height:30px; flex:0 0 auto; cursor:pointer;}
+  .switch input{display:none;}
+  .switch .track{position:absolute; inset:0; background:var(--line); border-radius:999px; transition:.2s;}
+  .switch .knob{position:absolute; top:3px; left:3px; width:24px; height:24px; background:#fff; border-radius:50%; transition:.2s; box-shadow:0 1px 4px rgba(0,0,0,.25);}
+  .switch input:checked + .track{background:var(--primary);}
+  .switch input:checked + .track + .knob{transform:translateX(20px);}
+  .text-btn{width:100%; padding:14px; border-radius:14px; border:1px solid var(--line); background:var(--surface); font-size:14px; font-weight:600; color:var(--ink); cursor:pointer; margin-bottom:9px;}
+  .text-btn.danger{color:var(--missed); border-color:var(--missed-soft); background:var(--missed-soft);}
+  .note{font-size:12px; color:var(--muted); line-height:1.6; padding:4px 6px 0;}
+
+  /* Bottom nav */
+  nav.tabs{position:fixed; left:0; right:0; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(10px);
+    border-top:1px solid var(--line); display:flex; padding:7px 6px calc(7px + env(safe-area-inset-bottom)); z-index:40; max-width:520px; margin:0 auto;}
+  nav.tabs button{flex:1; background:none; border:none; padding:6px 2px; display:flex; flex-direction:column; align-items:center; gap:3px; color:var(--muted); font-size:11px; font-weight:700; cursor:pointer;}
+  nav.tabs button .tico{font-size:21px; line-height:1;}
+  nav.tabs button.on{color:var(--primary);}
+
+  /* Modal */
+  .sheet-bg{position:fixed; inset:0; background:rgba(16,42,51,.45); z-index:60; display:none; align-items:flex-end; justify-content:center;}
+  .sheet-bg.show{display:flex;}
+  .sheet{background:var(--surface); width:100%; max-width:520px; border-radius:24px 24px 0 0; padding:8px 18px calc(24px + env(safe-area-inset-bottom)); max-height:92vh; overflow-y:auto; animation:up .25s ease;}
+  @keyframes up{from{transform:translateY(40px); opacity:.4;} to{transform:translateY(0); opacity:1;}}
+  .grab{width:42px; height:5px; border-radius:3px; background:var(--line); margin:8px auto 14px;}
+  .sheet h2{font-size:19px; font-weight:800; margin:0 0 18px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:7px;}
+  .field input[type=text], .field input[type=time], .field input[type=number]{
+    width:100%; padding:13px 14px; border:1.5px solid var(--line); border-radius:13px; font-size:16px; background:var(--surface-2); color:var(--ink); font-family:inherit;}
+  .field input:focus{outline:none; border-color:var(--primary);}
+  .step{display:flex; align-items:center; gap:0; border:1.5px solid var(--line); border-radius:13px; overflow:hidden; width:fit-content; background:var(--surface-2);}
+  .step button{width:50px; height:48px; border:none; background:transparent; font-size:24px; color:var(--primary-deep); cursor:pointer;}
+  .step .val{width:54px; text-align:center; font-size:18px; font-weight:800;}
+  .times-list{display:flex; flex-direction:column; gap:9px;}
+  .time-item{display:flex; align-items:center; gap:10px;}
+  .time-item .ti-label{font-size:13px; font-weight:700; color:var(--muted); width:42px;}
+  .time-item input{flex:1;}
+  .interval-box{background:var(--surface-2); border:1px solid var(--line); border-radius:13px; padding:12px; margin-top:10px;}
+  .interval-box .ib-row{display:flex; gap:10px; align-items:flex-end;}
+  .interval-box .ib-row > div{flex:1;}
+  .interval-box .ib-row label{font-size:11.5px; font-weight:700; color:var(--muted); display:block; margin-bottom:5px;}
+  .interval-box input{width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; font-size:15px; background:#fff;}
+  .interval-box button{margin-top:10px; width:100%; padding:11px; border:none; border-radius:10px; background:var(--primary); color:#fff; font-weight:700; font-size:13.5px; cursor:pointer;}
+  .colors{display:flex; gap:10px; flex-wrap:wrap;}
+  .color-dot{width:36px; height:36px; border-radius:50%; cursor:pointer; border:3px solid transparent; transition:.15s;}
+  .color-dot.on{border-color:var(--ink); transform:scale(1.08);}
+  .save-btn{width:100%; padding:16px; border:none; border-radius:14px; background:var(--primary); color:#fff; font-size:16px; font-weight:800; cursor:pointer; margin-top:6px; box-shadow:0 6px 16px rgba(14,154,167,.32);}
+  .del-link{width:100%; text-align:center; padding:13px; color:var(--missed); font-size:14px; font-weight:600; background:none; border:none; cursor:pointer; margin-top:8px;}
+
+  /* Day detail */
+  .dd-dose{display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--line);}
+  .dd-dose:last-child{border-bottom:none;}
+  .dd-dose .pill{width:5px; height:30px; border-radius:5px;}
+  .dd-dose .info{flex:1;}
+  .dd-dose .name{font-size:15px; font-weight:700;}
+  .dd-dose .meta{font-size:12px; color:var(--muted);}
+
+  /* Alarm toast */
+  .toast{position:fixed; top:calc(12px + env(safe-area-inset-top)); left:12px; right:12px; max-width:496px; margin:0 auto; z-index:80;
+    background:var(--ink); color:#fff; border-radius:16px; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.3);
+    display:none; align-items:center; gap:13px; animation:drop .3s ease;}
+  .toast.show{display:flex;}
+  @keyframes drop{from{transform:translateY(-20px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+  .toast .t-ico{font-size:26px;}
+  .toast .t-body{flex:1;}
+  .toast .t-title{font-weight:800; font-size:15px;}
+  .toast .t-sub{font-size:12.5px; opacity:.8; margin-top:2px;}
+  .toast .t-act{background:var(--primary); border:none; color:#fff; padding:9px 13px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer;}
+  .toast .t-close{background:rgba(255,255,255,.15); border:none; color:#fff; width:32px; height:32px; border-radius:9px; font-size:16px; cursor:pointer;}
+
+  .mini-toast{position:fixed; bottom:calc(90px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:11px 18px; border-radius:999px; font-size:13.5px; font-weight:600; z-index:90; opacity:0; transition:opacity .25s; pointer-events:none;}
+  .mini-toast.show{opacity:.96;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="date-row">
+      <div>
+        <div class="dow" id="hdrDow">—</div>
+        <div class="bigdate" id="hdrDate">—</div>
+      </div>
+      <div class="clock tabular" id="hdrClock">—</div>
+    </div>
+    <div class="progress-card">
+      <div class="drop-wrap">
+        <svg viewBox="0 0 100 116" width="74" height="84">
+          <defs>
+            <clipPath id="dropClip"><path d="M50 6 C50 6 16 52 16 76 A34 34 0 1 0 84 76 C84 52 50 6 50 6 Z"/></clipPath>
+          </defs>
+          <g clip-path="url(#dropClip)">
+            <rect x="0" y="0" width="100" height="116" fill="rgba(255,255,255,.18)"/>
+            <rect id="dropFill" x="0" y="116" width="100" height="0" fill="rgba(255,255,255,.9)"/>
+          </g>
+          <path d="M50 6 C50 6 16 52 16 76 A34 34 0 1 0 84 76 C84 52 50 6 50 6 Z" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="2.5"/>
+        </svg>
+        <div class="drop-count">
+          <b id="dropDone">0/0</b>
+          <span>완료</span>
+        </div>
+      </div>
+      <div class="progress-text">
+        <div class="pt-main" id="ptMain">오늘 점안 일정</div>
+        <div class="pt-sub" id="ptSub">—</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- TODAY -->
+    <section class="view active" id="view-today">
+      <div id="todayList"></div>
+    </section>
+
+    <!-- CALENDAR -->
+    <section class="view" id="view-cal">
+      <div class="cal-head">
+        <div class="cal-nav"><button id="prevM">‹</button></div>
+        <div class="mname" id="calMonth">—</div>
+        <div class="cal-nav"><button id="nextM">›</button></div>
+      </div>
+      <div class="weekdays">
+        <span class="sun">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="sat">토</span>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="note" style="margin-top:14px;">날짜를 누르면 그날의 점안 기록을 보거나 빠뜨린 항목을 체크할 수 있어요. <span style="color:var(--done)">●</span> 모두 완료 · <span style="color:var(--pending)">●</span> 일부 · <span style="color:var(--missed)">●</span> 미점안</div>
+    </section>
+
+    <!-- MEDS -->
+    <section class="view" id="view-meds">
+      <div class="section-title">등록한 안약</div>
+      <div id="medList"></div>
+      <button class="add-btn" id="addMedBtn">＋ 안약 추가하기</button>
+      <div class="note" style="margin-top:16px;">여러 안약을 같은 시간에 넣을 때는 한 종류씩 넣고 <b>약 5분 간격</b>을 두는 것이 좋아요. 정확한 점안 순서·간격은 안과 처방을 따르세요.</div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="view-set">
+      <div class="section-title">알람 방식</div>
+      <div class="set-card">
+        <div class="set-row">
+          <div class="sr-info">
+            <div class="sr-title">알람 켜기</div>
+            <div class="sr-sub">점안 시간에 알려드려요</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setAlarmOn"><span class="track"></span><span class="knob"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="sr-info">
+            <div class="sr-title">알림 유형</div>
+            <div class="sr-sub">진동 · 소리 · 무음 중 선택</div>
+          </div>
+          <div class="seg" id="setMode">
+            <button data-mode="vibrate">진동</button>
+            <button data-mode="sound">소리</button>
+            <button data-mode="silent">무음</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="sr-info">
+            <div class="sr-title">미점안 시 재알림</div>
+            <div class="sr-sub">아직 안 넣었으면 10분마다 다시 알림</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setReRemind"><span class="track"></span><span class="knob"></span></label>
+        </div>
+      </div>
+
+      <div class="section-title">알림 권한</div>
+      <div class="set-card">
+        <div class="set-row">
+          <div class="sr-info">
+            <div class="sr-title">휴대폰 알림 허용</div>
+            <div class="sr-sub" id="permSub">잠금화면 알림을 받으려면 허용하세요</div>
+          </div>
+          <button class="icon-btn" id="permBtn" style="width:auto; padding:0 14px; font-size:13px; font-weight:700;">허용</button>
+        </div>
+      </div>
+
+      <div class="section-title">데이터</div>
+      <button class="text-btn" id="exportBtn">기록 내보내기 (백업)</button>
+      <button class="text-btn danger" id="resetBtn">모든 기록 초기화</button>
+
+      <div class="note" style="margin-top:6px;">
+        이 앱은 휴대폰 안에만 기록을 저장합니다(서버 전송 없음). 웹앱 특성상 <b>앱이 화면에 열려 있을 때</b> 알람이 가장 정확합니다. 잠금 상태에서도 받으려면 위 알림 권한을 허용하고, 홈 화면에 추가해 사용하세요. 진료·복약 안내는 담당 의사·약사 지시를 우선하세요.
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button class="on" data-tab="today"><span class="tico">💧</span>오늘</button>
+    <button data-tab="cal"><span class="tico">📅</span>달력</button>
+    <button data-tab="meds"><span class="tico">💊</span>안약</button>
+    <button data-tab="set"><span class="tico">⚙️</span>설정</button>
+  </nav>
+</div>
+
+<!-- Med edit sheet -->
+<div class="sheet-bg" id="medSheet">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="sheetTitle">안약 추가</h2>
+    <div class="field">
+      <label>안약 이름</label>
+      <input type="text" id="fName" placeholder="예: 코솝, 알파간, 타프로탄" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>점안 부위</label>
+      <div class="seg" id="fEye" style="width:fit-content;">
+        <button data-eye="양안">양안</button>
+        <button data-eye="좌안">좌안</button>
+        <button data-eye="우안">우안</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>하루 점안 횟수</label>
+      <div class="step">
+        <button id="cntMinus">−</button>
+        <div class="val tabular" id="cntVal">1</div>
+        <button id="cntPlus">＋</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>점안 시간</label>
+      <div class="times-list" id="timesList"></div>
+      <div class="interval-box">
+        <div class="ib-row">
+          <div><label>시작 시간</label><input type="time" id="ivStart" value="08:00"></div>
+          <div><label>간격(시간)</label><input type="number" id="ivGap" value="8" min="1" max="24"></div>
+        </div>
+        <button id="ivApply">간격으로 시간 자동 채우기</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>색상</label>
+      <div class="colors" id="fColors"></div>
+    </div>
+    <button class="save-btn" id="saveMed">저장</button>
+    <button class="del-link" id="delMed" style="display:none;">이 안약 삭제</button>
+  </div>
+</div>
+
+<!-- Day detail sheet -->
+<div class="sheet-bg" id="daySheet">
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="dayTitle">—</h2>
+    <div id="dayList"></div>
+  </div>
+</div>
+
+<!-- Alarm toast -->
+<div class="toast" id="toast">
+  <div class="t-ico">💧</div>
+  <div class="t-body"><div class="t-title" id="toastTitle">점안 시간이에요</div><div class="t-sub" id="toastSub">—</div></div>
+  <button class="t-act" id="toastAct">완료</button>
+  <button class="t-close" id="toastClose">✕</button>
+</div>
+<div class="mini-toast" id="miniToast"></div>
+
+<script>
+"use strict";
+(function(){
+  const LS = { meds:'eyedrop.meds.v1', rec:'eyedrop.records.v1', set:'eyedrop.settings.v1' };
+  const PALETTE = ['#0E9AA7','#5B6CFF','#E0567B','#E08A2B','#8B5CF6','#16A34A','#0EA5E9','#EF4444'];
+  const DOW = ['일','월','화','수','목','금','토'];
+
+  // ---------- State ----------
+  let meds = load(LS.meds, null);
+  let records = load(LS.rec, {});      // { 'YYYY-MM-DD': { medId: { '0':timeStr|true|false } } }
+  let settings = load(LS.set, { alarmOn:true, mode:'vibrate', reRemind:true });
+
+  if(!meds){
+    meds = [
+      { id:uid(), name:'타프로탄', eye:'양안', times:['21:00'], color:'#0E9AA7', on:true },
+      { id:uid(), name:'코솝',     eye:'양안', times:['08:00','20:00'], color:'#5B6CFF', on:true },
+      { id:uid(), name:'알파간',   eye:'양안', times:['08:00','14:00','22:00'], color:'#E0567B', on:true }
+    ];
+    save(LS.meds, meds);
+  }
+
+  let calRef = new Date(); calRef.setDate(1);
+  let editingId = null;
+  const alarmFired = new Map();  // key -> 'YYYY-MM-DD HH:MM'
+
+  // ---------- Native (Capacitor) layer ----------
+  const Cap = window.Capacitor;
+  const isNative = !!(Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform());
+  const LN = (isNative && Cap.Plugins) ? Cap.Plugins.LocalNotifications : null;
+
+  function channelFor(mode){ return mode==='sound' ? 'ed_sound' : (mode==='vibrate' ? 'ed_vibrate' : 'ed_silent'); }
+
+  async function nativeInit(){
+    if(!LN) return;
+    try{
+      await LN.requestPermissions();
+      await LN.createChannel({ id:'ed_sound',   name:'안약 알림 (소리)', description:'점안 시간 알림', importance:5, visibility:1, vibration:true });
+      await LN.createChannel({ id:'ed_vibrate', name:'안약 알림 (진동)', description:'점안 시간 알림', importance:4, visibility:1, vibration:true, sound:'silence' });
+      await LN.createChannel({ id:'ed_silent',  name:'안약 알림 (무음)', description:'점안 시간 알림', importance:2, visibility:1, vibration:false });
+      await scheduleNative();
+    }catch(e){ console.warn('nativeInit', e); }
+  }
+
+  async function scheduleNative(){
+    if(!LN) return;
+    try{
+      const prev = load('eyedrop.notifIds', []);
+      if(prev && prev.length){ await LN.cancel({ notifications: prev.map(id=>({id})) }); }
+      const list=[]; const ids=[]; let n=1;
+      if(settings.alarmOn){
+        const ch = channelFor(settings.mode);
+        meds.forEach(m=>{
+          if(!m.on) return;
+          m.times.forEach(t=>{
+            const hh=parseInt(t.split(':')[0],10), mm=parseInt(t.split(':')[1],10);
+            const id=n++; ids.push(id);
+            list.push({
+              id,
+              title: m.name+' 점안 시간',
+              body: t+' · '+m.eye+' 점안하세요',
+              channelId: ch,
+              schedule: { on:{ hour:hh, minute:mm }, repeats:true, allowWhileIdle:true }
+            });
+          });
+        });
+      }
+      if(list.length) await LN.schedule({ notifications:list });
+      save('eyedrop.notifIds', ids);
+    }catch(e){ console.warn('scheduleNative', e); }
+  }
+
+  // ---------- Utils ----------
+  function uid(){ return 'm'+Math.random().toString(36).slice(2,9); }
+  function load(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+  function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function dkey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function pad(n){ return String(n).padStart(2,'0'); }
+  function nowHM(){ const d=new Date(); return pad(d.getHours())+':'+pad(d.getMinutes()); }
+  function minutesOf(hm){ const p=hm.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+
+  function getRec(key){ if(!records[key]) records[key]={}; return records[key]; }
+  function isChecked(key, medId, idx){
+    const r=records[key]; if(!r||!r[medId]) return false;
+    return !!r[medId][String(idx)];
+  }
+  function checkedLabel(key, medId, idx){
+    const r=records[key]; if(!r||!r[medId]) return null;
+    const v=r[medId][String(idx)];
+    if(v && typeof v==='string') return v;
+    return v?'완료':null;
+  }
+  function toggleCheck(key, medId, idx, timeLabel){
+    const r=getRec(key); if(!r[medId]) r[medId]={};
+    const cur=r[medId][String(idx)];
+    if(cur){ delete r[medId][String(idx)]; }
+    else { r[medId][String(idx)] = (key===dkey(new Date())) ? ('넣음 '+nowHM()) : ('체크함 '+timeLabel); }
+    save(LS.rec, records);
+  }
+
+  // ---------- Header / progress ----------
+  function todayDoses(){
+    const out=[];
+    meds.forEach(m=>{ if(!m.on) return; m.times.forEach((t,i)=>out.push({m,t,i})); });
+    out.sort((a,b)=> minutesOf(a.t)-minutesOf(b.t));
+    return out;
+  }
+  function renderHeader(){
+    const d=new Date(); const key=dkey(d);
+    document.getElementById('hdrDow').textContent = DOW[d.getDay()]+'요일';
+    document.getElementById('hdrDate').textContent = (d.getMonth()+1)+'월 '+d.getDate()+'일';
+    document.getElementById('hdrClock').textContent = pad(d.getHours())+':'+pad(d.getMinutes());
+    const doses=todayDoses();
+    const total=doses.length;
+    let done=0; doses.forEach(x=>{ if(isChecked(key,x.m.id,x.i)) done++; });
+    document.getElementById('dropDone').textContent = done+'/'+total;
+    const pct = total? done/total : 0;
+    const fillH = 116*pct;
+    const fill=document.getElementById('dropFill');
+    fill.setAttribute('y', 116-fillH); fill.setAttribute('height', fillH);
+    let left = total-done;
+    document.getElementById('ptMain').textContent = total===0 ? '등록된 안약이 없어요'
+      : (left===0 ? '오늘 점안 모두 완료 👏' : '아직 '+left+'회 남았어요');
+    // next pending
+    let nextTxt='';
+    const nowm=minutesOf(nowHM());
+    const pend=doses.filter(x=>!isChecked(key,x.m.id,x.i));
+    if(pend.length){
+      const up=pend.find(x=>minutesOf(x.t)>=nowm) || pend[0];
+      nextTxt='다음: '+up.m.name+' '+up.t;
+    } else if(total>0){ nextTxt='내일도 잊지 말고 챙기세요'; }
+    document.getElementById('ptSub').textContent = nextTxt;
+  }
+
+  // ---------- Today view ----------
+  function renderToday(){
+    const key=dkey(new Date());
+    const wrap=document.getElementById('todayList');
+    const doses=todayDoses();
+    if(!doses.length){
+      wrap.innerHTML='<div class="empty"><span class="em-ico">💧</span>등록된 안약이 없어요.<br>아래 <b>안약</b> 탭에서 추가해 주세요.</div>';
+      return;
+    }
+    // group by time
+    const groups={};
+    doses.forEach(x=>{ (groups[x.t]=groups[x.t]||[]).push(x); });
+    const nowm=minutesOf(nowHM());
+    let html='';
+    Object.keys(groups).sort((a,b)=>minutesOf(a)-minutesOf(b)).forEach(t=>{
+      const items=groups[t];
+      const allDone=items.every(x=>isChecked(key,x.m.id,x.i));
+      let tag, tagCls;
+      if(allDone){ tag='완료'; tagCls='done'; }
+      else if(minutesOf(t)<=nowm){ tag='지금'; tagCls='due'; }
+      else { tag='예정'; tagCls='upcoming'; }
+      html+='<div class="timeblock"><div class="timeblock-head"><span class="th-time tabular">'+t+'</span><span class="th-tag '+tagCls+'">'+tag+'</span></div>';
+      items.forEach(x=>{
+        const ck=isChecked(key,x.m.id,x.i);
+        const lbl=checkedLabel(key,x.m.id,x.i);
+        const overdue=!ck && minutesOf(t)<=nowm;
+        html+='<div class="dose'+(ck?' checked':'')+'" data-mid="'+x.m.id+'" data-idx="'+x.i+'" data-t="'+t+'">'
+          +'<div class="pill" style="background:'+x.m.color+'"></div>'
+          +'<div class="info"><div class="name">'+esc(x.m.name)+'<span class="eye">'+x.m.eye+'</span></div>'
+          +'<div class="meta">'+(ck?('✓ '+(lbl||'완료')):(overdue?'아직 안 넣었어요':'점안 예정'))+'</div></div>'
+          +'<button class="check-btn'+(ck?' on':'')+'">'+(ck?'✓':'＋')+'</button></div>';
+      });
+      html+='</div>';
+    });
+    wrap.innerHTML=html;
+    wrap.querySelectorAll('.dose').forEach(el=>{
+      el.addEventListener('click',()=>{
+        toggleCheck(key, el.dataset.mid, parseInt(el.dataset.idx,10), el.dataset.t);
+        haptic();
+        renderToday(); renderHeader();
+      });
+    });
+  }
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  // ---------- Calendar ----------
+  function dayStatus(key){
+    // returns {total, done} for that date based on CURRENT enabled meds schedule
+    let total=0, done=0;
+    meds.forEach(m=>{ if(!m.on) return; m.times.forEach((t,i)=>{ total++; if(isChecked(key,m.id,i)) done++; }); });
+    return {total, done};
+  }
+  function renderCal(){
+    document.getElementById('calMonth').textContent = calRef.getFullYear()+'년 '+(calRef.getMonth()+1)+'월';
+    const grid=document.getElementById('calGrid');
+    const first=new Date(calRef.getFullYear(), calRef.getMonth(), 1);
+    const startDow=first.getDay();
+    const days=new Date(calRef.getFullYear(), calRef.getMonth()+1, 0).getDate();
+    const todayKey=dkey(new Date());
+    let html='';
+    for(let i=0;i<startDow;i++) html+='<div class="cell blank"></div>';
+    for(let d=1; d<=days; d++){
+      const dt=new Date(calRef.getFullYear(), calRef.getMonth(), d);
+      const key=dkey(dt);
+      const dow=dt.getDay();
+      const isToday=key===todayKey;
+      const isFuture=dt> new Date(new Date().setHours(23,59,59,999));
+      const st=dayStatus(key);
+      let ind='';
+      if(isFuture){ ind='<div class="dot-mini" style="background:var(--line)"></div>'; }
+      else if(st.total===0){ ind='<div class="dot-mini" style="background:var(--line)"></div>'; }
+      else {
+        const pct=Math.round(st.done/st.total*100);
+        let col = st.done===st.total ? 'var(--done)' : (st.done===0 ? 'var(--missed)' : 'var(--pending)');
+        ind='<div class="ring" style="background:conic-gradient('+col+' '+pct+'%, var(--line) 0)"></div>';
+      }
+      html+='<div class="cell'+(isToday?' today':'')+(isFuture?' future':'')+(dow===0?' sun':'')+(dow===6?' sat':'')+'" data-key="'+key+'" data-future="'+isFuture+'">'
+        +'<div class="dnum">'+d+'</div>'+ind+'</div>';
+    }
+    grid.innerHTML=html;
+    grid.querySelectorAll('.cell:not(.blank)').forEach(el=>{
+      el.addEventListener('click',()=>openDay(el.dataset.key, el.dataset.future==='true'));
+    });
+  }
+
+  function openDay(key, isFuture){
+    const parts=key.split('-');
+    const dt=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+    document.getElementById('dayTitle').textContent = (dt.getMonth()+1)+'월 '+dt.getDate()+'일 ('+DOW[dt.getDay()]+')';
+    const list=document.getElementById('dayList');
+    const rows=[];
+    meds.forEach(m=>{ if(!m.on) return; m.times.forEach((t,i)=>rows.push({m,t,i})); });
+    rows.sort((a,b)=>minutesOf(a.t)-minutesOf(b.t));
+    if(!rows.length){ list.innerHTML='<div class="empty">등록된 안약이 없어요.</div>'; }
+    else {
+      let html='';
+      rows.forEach(x=>{
+        const ck=isChecked(key,x.m.id,x.i);
+        const lbl=checkedLabel(key,x.m.id,x.i);
+        html+='<div class="dd-dose"><div class="pill" style="background:'+x.m.color+'"></div>'
+          +'<div class="info"><div class="name">'+esc(x.m.name)+' <span style="font-weight:600;color:var(--muted)">'+x.t+'</span></div>'
+          +'<div class="meta">'+(ck?('✓ '+(lbl||'완료')):'미점안')+'</div></div>'
+          +(isFuture?'<span style="font-size:12px;color:var(--muted)">예정</span>'
+            :'<button class="check-btn'+(ck?' on':'')+'" data-mid="'+x.m.id+'" data-idx="'+x.i+'" data-t="'+x.t+'" style="width:46px;height:46px;font-size:20px;">'+(ck?'✓':'＋')+'</button>')
+          +'</div>';
+      });
+      list.innerHTML=html;
+      if(!isFuture){
+        list.querySelectorAll('.check-btn').forEach(b=>{
+          b.addEventListener('click',()=>{
+            toggleCheck(key, b.dataset.mid, parseInt(b.dataset.idx,10), b.dataset.t);
+            haptic(); openDay(key,false); renderCal(); renderHeader();
+            if(key===dkey(new Date())) renderToday();
+          });
+        });
+      }
+    }
+    showSheet('daySheet');
+  }
+
+  // ---------- Meds view ----------
+  function renderMeds(){
+    const wrap=document.getElementById('medList');
+    if(!meds.length){ wrap.innerHTML='<div class="empty"><span class="em-ico">💊</span>아직 등록된 안약이 없어요.</div>'; return; }
+    let html='';
+    meds.forEach(m=>{
+      html+='<div class="med-row'+(m.on?'':' off')+'"><div class="pill" style="background:'+m.color+'"></div>'
+        +'<div class="info"><div class="name">'+esc(m.name)+'</div>'
+        +'<div class="meta">'+m.eye+' · 일 '+m.times.length+'회 · '+m.times.join(', ')+'</div></div>'
+        +'<button class="icon-btn tg" data-id="'+m.id+'">'+(m.on?'🔔':'🔕')+'</button>'
+        +'<button class="icon-btn ed" data-id="'+m.id+'">✏️</button></div>';
+    });
+    wrap.innerHTML=html;
+    wrap.querySelectorAll('.tg').forEach(b=>b.addEventListener('click',()=>{
+      const m=meds.find(x=>x.id===b.dataset.id); m.on=!m.on; save(LS.meds,meds); renderMeds(); renderToday(); renderHeader(); scheduleNative();
+    }));
+    wrap.querySelectorAll('.ed').forEach(b=>b.addEventListener('click',()=>openMedSheet(b.dataset.id)));
+  }
+
+  // ---------- Med sheet ----------
+  let formTimes=['08:00'], formEye='양안', formColor=PALETTE[0];
+  function openMedSheet(id){
+    editingId=id||null;
+    const colorWrap=document.getElementById('fColors');
+    colorWrap.innerHTML=PALETTE.map(c=>'<div class="color-dot" data-c="'+c+'" style="background:'+c+'"></div>').join('');
+    if(id){
+      const m=meds.find(x=>x.id===id);
+      document.getElementById('sheetTitle').textContent='안약 편집';
+      document.getElementById('fName').value=m.name;
+      formTimes=m.times.slice(); formEye=m.eye; formColor=m.color;
+      document.getElementById('delMed').style.display='block';
+    } else {
+      document.getElementById('sheetTitle').textContent='안약 추가';
+      document.getElementById('fName').value='';
+      formTimes=['08:00']; formEye='양안'; formColor=PALETTE[0];
+      document.getElementById('delMed').style.display='none';
+    }
+    syncEye(); syncColor(); renderTimes();
+    showSheet('medSheet');
+  }
+  function syncEye(){ document.querySelectorAll('#fEye button').forEach(b=>b.classList.toggle('on', b.dataset.eye===formEye)); }
+  function syncColor(){ document.querySelectorAll('#fColors .color-dot').forEach(b=>b.classList.toggle('on', b.dataset.c===formColor)); }
+  function renderTimes(){
+    document.getElementById('cntVal').textContent=formTimes.length;
+    const list=document.getElementById('timesList');
+    list.innerHTML=formTimes.map((t,i)=>'<div class="time-item"><span class="ti-label">'+(i+1)+'회</span><input type="time" data-i="'+i+'" value="'+t+'"></div>').join('');
+    list.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',()=>{ formTimes[parseInt(inp.dataset.i,10)]=inp.value; }));
+  }
+
+  // ---------- Alarm engine ----------
+  let audioCtx=null;
+  function ensureAudio(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }
+  function beep(){
+    if(!audioCtx) return;
+    [0,0.18].forEach((delay,k)=>{
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+      o.type='sine'; o.frequency.value= k===0?880:1175;
+      o.connect(g); g.connect(audioCtx.destination);
+      const t=audioCtx.currentTime+delay;
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+      o.start(t); o.stop(t+0.17);
+    });
+  }
+  function haptic(){ if(navigator.vibrate) try{ navigator.vibrate(15); }catch(e){} }
+
+  function fireAlarm(med, time, idx){
+    const title=med.name+' 점안 시간이에요';
+    const sub=time+' · '+med.eye+' · 점안 후 완료를 눌러주세요';
+    if(!isNative){
+      if(settings.mode==='sound'){ ensureAudio(); beep(); }
+      if(settings.mode==='vibrate' && navigator.vibrate){ try{ navigator.vibrate([220,120,220]); }catch(e){} }
+    }
+    // notification
+    if('Notification' in window && Notification.permission==='granted'){
+      try{ new Notification(title,{body:sub, tag:'eyedrop-'+med.id+'-'+idx, renotify:true}); }catch(e){}
+    }
+    // in-app toast
+    document.getElementById('toastTitle').textContent=title;
+    document.getElementById('toastSub').textContent=sub;
+    const toast=document.getElementById('toast');
+    toast.classList.add('show');
+    toast.dataset.mid=med.id; toast.dataset.idx=idx; toast.dataset.t=time;
+  }
+  function alarmTick(){
+    renderHeader();
+    if(!settings.alarmOn) return;
+    const now=new Date(); const key=dkey(now);
+    const nowMin=key+' '+pad(now.getHours())+':'+pad(now.getMinutes());
+    const nowm=now.getHours()*60+now.getMinutes();
+    meds.forEach(m=>{
+      if(!m.on) return;
+      m.times.forEach((t,i)=>{
+        if(isChecked(key,m.id,i)) return;
+        const tm=minutesOf(t);
+        const diff=nowm-tm;
+        let due=false;
+        if(diff===0) due=true;
+        else if(settings.reRemind && diff>0 && diff<=120 && diff%10===0) due=true;
+        if(due){
+          const fkey=m.id+'-'+i;
+          if(alarmFired.get(fkey)!==nowMin){
+            alarmFired.set(fkey, nowMin);
+            fireAlarm(m,t,i);
+          }
+        }
+      });
+    });
+  }
+
+  // ---------- Settings ----------
+  function renderSettings(){
+    document.getElementById('setAlarmOn').checked=settings.alarmOn;
+    document.getElementById('setReRemind').checked=settings.reRemind;
+    document.querySelectorAll('#setMode button').forEach(b=>b.classList.toggle('on', b.dataset.mode===settings.mode));
+    if('Notification' in window){
+      const p=Notification.permission;
+      document.getElementById('permSub').textContent = p==='granted'?'알림이 허용되어 있어요':(p==='denied'?'브라우저 설정에서 알림을 허용해 주세요':'잠금화면 알림을 받으려면 허용하세요');
+      document.getElementById('permBtn').textContent = p==='granted'?'허용됨':'허용';
+    } else {
+      document.getElementById('permSub').textContent='이 브라우저는 알림을 지원하지 않아요';
+      document.getElementById('permBtn').style.display='none';
+    }
+  }
+  function mini(msg){ const t=document.getElementById('miniToast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1600); }
+
+  // ---------- Sheets ----------
+  function showSheet(id){ document.getElementById(id).classList.add('show'); }
+  function hideSheet(id){ document.getElementById(id).classList.remove('show'); }
+
+  // ---------- Tabs ----------
+  function switchTab(tab){
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+tab).classList.add('active');
+    if(tab==='today') renderToday();
+    if(tab==='cal') renderCal();
+    if(tab==='meds') renderMeds();
+    if(tab==='set') renderSettings();
+    window.scrollTo(0,0);
+  }
+
+  // ---------- Events ----------
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>{ ensureAudio(); switchTab(b.dataset.tab); }));
+
+  document.getElementById('prevM').addEventListener('click',()=>{ calRef.setMonth(calRef.getMonth()-1); renderCal(); });
+  document.getElementById('nextM').addEventListener('click',()=>{ calRef.setMonth(calRef.getMonth()+1); renderCal(); });
+
+  document.getElementById('addMedBtn').addEventListener('click',()=>openMedSheet(null));
+
+  // Med sheet controls
+  document.querySelectorAll('#fEye button').forEach(b=>b.addEventListener('click',()=>{ formEye=b.dataset.eye; syncEye(); }));
+  document.getElementById('fColors').addEventListener('click',(e)=>{ const d=e.target.closest('.color-dot'); if(d){ formColor=d.dataset.c; syncColor(); } });
+  document.getElementById('cntPlus').addEventListener('click',()=>{ if(formTimes.length<8){ const last=formTimes[formTimes.length-1]||'08:00'; formTimes.push(last); renderTimes(); } });
+  document.getElementById('cntMinus').addEventListener('click',()=>{ if(formTimes.length>1){ formTimes.pop(); renderTimes(); } });
+  document.getElementById('ivApply').addEventListener('click',()=>{
+    const start=document.getElementById('ivStart').value||'08:00';
+    const gap=Math.max(1,Math.min(24,parseInt(document.getElementById('ivGap').value||'8',10)));
+    const n=formTimes.length;
+    let m0=minutesOf(start);
+    formTimes=[];
+    for(let i=0;i<n;i++){ const mm=(m0+gap*60*i)%1440; formTimes.push(pad(Math.floor(mm/60))+':'+pad(mm%60)); }
+    renderTimes();
+    mini('간격으로 시간을 채웠어요');
+  });
+  document.getElementById('saveMed').addEventListener('click',()=>{
+    const name=document.getElementById('fName').value.trim();
+    if(!name){ mini('안약 이름을 입력해 주세요'); return; }
+    const times=formTimes.slice().sort((a,b)=>minutesOf(a)-minutesOf(b));
+    if(editingId){
+      const m=meds.find(x=>x.id===editingId);
+      m.name=name; m.eye=formEye; m.times=times; m.color=formColor;
+    } else {
+      meds.push({ id:uid(), name, eye:formEye, times, color:formColor, on:true });
+    }
+    save(LS.meds,meds);
+    hideSheet('medSheet'); renderMeds(); renderToday(); renderHeader();
+    scheduleNative();
+    mini('저장했어요');
+  });
+  document.getElementById('delMed').addEventListener('click',()=>{
+    if(!editingId) return;
+    if(confirm('이 안약을 삭제할까요? 기록은 남아있지 않습니다.')){
+      meds=meds.filter(x=>x.id!==editingId); save(LS.meds,meds);
+      hideSheet('medSheet'); renderMeds(); renderToday(); renderHeader();
+      scheduleNative();
+    }
+  });
+
+  // Settings controls
+  document.getElementById('setAlarmOn').addEventListener('change',(e)=>{ settings.alarmOn=e.target.checked; save(LS.set,settings); scheduleNative(); });
+  document.getElementById('setReRemind').addEventListener('change',(e)=>{ settings.reRemind=e.target.checked; save(LS.set,settings); });
+  document.querySelectorAll('#setMode button').forEach(b=>b.addEventListener('click',()=>{
+    settings.mode=b.dataset.mode; save(LS.set,settings); renderSettings(); scheduleNative();
+    if(settings.mode==='sound'){ ensureAudio(); beep(); }
+    if(settings.mode==='vibrate' && navigator.vibrate){ try{navigator.vibrate([180,90,180]);}catch(e){} }
+  }));
+  document.getElementById('permBtn').addEventListener('click',()=>{
+    if('Notification' in window){ Notification.requestPermission().then(()=>renderSettings()); }
+  });
+  document.getElementById('exportBtn').addEventListener('click',()=>{
+    const data={meds, records, settings, exportedAt:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='안약기록_'+dkey(new Date())+'.json'; a.click();
+    mini('백업 파일을 저장했어요');
+  });
+  document.getElementById('resetBtn').addEventListener('click',()=>{
+    if(confirm('모든 점안 기록을 지울까요? 등록한 안약은 유지됩니다.')){
+      records={}; save(LS.rec,records); renderToday(); renderHeader(); renderCal(); mini('기록을 초기화했어요');
+    }
+  });
+
+  // Toast
+  document.getElementById('toastAct').addEventListener('click',()=>{
+    const toast=document.getElementById('toast');
+    const key=dkey(new Date());
+    toggleCheck(key, toast.dataset.mid, parseInt(toast.dataset.idx,10), toast.dataset.t);
+    toast.classList.remove('show'); renderToday(); renderHeader();
+  });
+  document.getElementById('toastClose').addEventListener('click',()=>document.getElementById('toast').classList.remove('show'));
+
+  // Sheet backgrounds: tap outside to close
+  ['medSheet','daySheet'].forEach(id=>{
+    document.getElementById(id).addEventListener('click',(e)=>{ if(e.target.id===id) hideSheet(id); });
+  });
+
+  document.body.addEventListener('click',()=>ensureAudio(),{once:false});
+
+  // ---------- Init ----------
+  function dateWatcher(){
+    // re-render header date at midnight crossing handled by tick
+  }
+  renderHeader(); renderToday();
+  nativeInit();
+  setInterval(alarmTick, 15000);
+  // also tick clock every 30s for header
+  setInterval(renderHeader, 30000);
+})();
+</script>
+</body>
+</html>

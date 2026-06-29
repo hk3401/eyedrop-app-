@@ -1,0 +1,14 @@
+{
+  "appId": "kr.co.hdps.eyedrop",
+  "appName": "안약체크",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_drop",
+      "iconColor": "#0E9AA7"
+    }
+  }
+}
