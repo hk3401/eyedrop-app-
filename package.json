@@ -2,10 +2,6 @@
   "name": "eyedrop-app",
   "version": "1.0.0",
   "private": true,
-  "description": "안약 점안 체크 안드로이드 앱",
-  "scripts": {
-    "sync": "cap sync android"
-  },
   "dependencies": {
     "@capacitor/android": "^6.1.2",
     "@capacitor/app": "^6.0.1",
